@@ -198,9 +198,9 @@ function parseSheet(csv){
 }
 
 function getVal(rowIdx, colIdx){
-  // rowIdx: 엑셀 행번호(1-indexed) → CSV 0-indexed = rowIdx-1
+  // rowIdx: 구글시트 행번호(1-indexed) → CSV 0-indexed = rowIdx-1
   const row = rawRows[rowIdx-1] || [];
-  const v = String(row[colIdx]||'').replace(/,/g,'').replace(/-/g,'0').trim();
+  const v = String(row[colIdx]||'').replace(/,/g,'').replace(/-/g,'0').replace(/%/g,'').trim();
   return parseFloat(v)||0;
 }
 
@@ -219,11 +219,11 @@ function getData(rowKey, colIdx){
 // ── 마케팅 동의율 행 매핑 ────────────────────────────────────
 // 스크린샷에 마케팅동의율 행이 있으면 행번호 지정, 없으면 null
 const MKT_ROW = {
-  전체:   36,
-  차량:   37,
-  멤버십: 38,
-  정비:   39,
-  검사:   40,
+  전체:   35,
+  차량:   36,
+  멤버십: 37,
+  정비:   38,
+  검사:   39,
 };
 
 // ── 렌더링 ──────────────────────────────────────────────────
