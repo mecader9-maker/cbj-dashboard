@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>차방정 주실적 대시보드</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+:root {
+  --bg:#f5f6f8;--surface:#fff;--surface2:#f0f2f5;--border:#e2e5ea;
+  --text:#1a1d23;--text2:#6b7280;--text3:#9ca3af;
+  --blue:#185FA5;--blue-l:#e8f0fb;--teal:#1D9E75;--teal-l:#e6f7f2;
+  --amber:#BA7517;--amber-l:#fef3e2;--coral:#D85A30;--coral-l:#fdeee9;
+  --purple:#534AB7;--purple-l:#eeecfd;--pink:#993556;
+  --r:10px;--rs:6px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Apple SD Gothic Neo','Noto Sans KR',sans-serif;background:var(--bg);color:var(--text);font-size:14px}
+
+#lock{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:9999}
+.lcard{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:2.5rem 2rem;width:320px;text-align:center}
+.llogo{font-size:26px;font-weight:700;color:var(--blue);margin-bottom:4px}
+.lsub{font-size:12px;color:var(--text2);margin-bottom:1.5rem}
+.lcard input{width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:var(--rs);font-size:14px;margin-bottom:10px;outline:none;background:var(--bg)}
+.lcard input:focus{border-color:var(--blue)}
+.lbtn{width:100%;padding:10px;background:var(--blue);color:#fff;border:none;border-radius:var(--rs);font-size:14px;font-weight:500;cursor:pointer}
+.lbtn:hover{background:#0c447c}
+.lerr{font-size:12px;color:#e24b4a;margin-top:6px;display:none}
+
+#app{display:none}
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 2rem;display:flex;align-items:center;justify-content:space-between;height:54px;position:sticky;top:0;z-index:100}
+.hlogo{font-size:15px;font-weight:700;color:var(--blue)}
+.hbadge{font-size:11px;background:var(--blue-l);color:var(--blue);padding:2px 8px;border-radius:20px;font-weight:500;margin-left:8px}
+.hright{display:flex;align-items:center;gap:12px}
+.rbtn{display:flex;align-items:center;gap:5px;padding:6px 12px;border:1px solid var(--border);border-radius:var(--rs);background:var(--surface);font-size:12px;cursor:pointer;color:var(--text2)}
+.rbtn:hover{background:var(--bg)}
+.dinfo{font-size:11px;color:var(--text3)}
+#spin{display:none;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+main{padding:1.5rem 2rem;max-width:1200px;margin:0 auto}
+
+.wbar{display:flex;align-items:center;gap:6px;margin-bottom:1.5rem;flex-wrap:wrap}
+.wlabel{font-size:12px;color:var(--text3);margin-right:2px;white-space:nowrap}
+.wtab{padding:5px 13px;border-radius:20px;border:1px solid var(--border);font-size:12px;cursor:pointer;background:var(--surface);color:var(--text2);transition:all .15s;white-space:nowrap}
+.wtab.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+.wtab:hover:not(.active){background:var(--bg)}
+
+.kgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:10px;margin-bottom:1.25rem}
+.kcard{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1rem 1.1rem;border-top:3px solid var(--ac,var(--blue))}
+.klabel{font-size:11px;color:var(--text2);margin-bottom:3px}
+.kval{font-size:24px;font-weight:700;color:var(--text)}
+.ktrend{font-size:11px;margin-top:2px}
+.up{color:var(--teal)}.dn{color:var(--coral)}.fl{color:var(--text3)}
+
+.cgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.cfull{grid-column:1/-1}
+.ccard{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1.1rem}
+.cttl{font-size:13px;font-weight:600;margin-bottom:2px}
+.csub{font-size:11px;color:var(--text3);margin-bottom:10px}
+.leg{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+.li{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text2)}
+.ld{width:9px;height:9px;border-radius:2px;flex-shrink:0}
+
+.sttl{font-size:13px;font-weight:600;margin:1.25rem 0 .6rem}
+.mgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:8px;margin-bottom:1.5rem}
+.mcard{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:.9rem}
+.mlabel{font-size:11px;color:var(--text2);margin-bottom:7px}
+.mbar{background:var(--bg);border-radius:4px;height:5px;margin-bottom:5px}
+.mfill{background:var(--blue);border-radius:4px;height:5px;transition:width .5s}
+.mpct{font-size:20px;font-weight:700}
+.mcnt{font-size:11px;color:var(--text3);margin-top:1px}
+
+#empty{text-align:center;padding:4rem 0;color:var(--text2)}
+.eicon{font-size:40px;margin-bottom:1rem;opacity:.3}
+
+@media(max-width:640px){
+  main{padding:1rem}
+  .cgrid{grid-template-columns:1fr}
+  header{padding:0 1rem}
+}
+</style>
+</head>
+<body>
+
+<div id="lock">
+  <div class="lcard">
+    <div class="llogo">차방정</div>
+    <div class="lsub">롯데렌탈 내부용 실적 대시보드</div>
+    <input type="password" id="pw" placeholder="비밀번호 입력" onkeydown="if(event.key==='Enter')login()">
+    <button class="lbtn" onclick="login()">로그인</button>
+    <div class="lerr" id="perr">비밀번호가 올바르지 않습니다.</div>
+  </div>
+</div>
+
+<div id="app">
+  <header>
+    <div style="display:flex;align-items:center">
+      <span class="hlogo">차방정 실적</span>
+      <span class="hbadge" id="hbadge">로딩 중</span>
+    </div>
+    <div class="hright">
+      <span class="dinfo" id="dinfo"></span>
+      <div id="spin"></div>
+      <button class="rbtn" onclick="loadData()">↻ 새로고침</button>
+    </div>
+  </header>
+
+  <main>
+    <div id="empty">
+      <div class="eicon">📊</div>
+      <div style="font-size:15px;font-weight:500;margin-bottom:6px">데이터 로딩 중...</div>
+      <div style="font-size:12px;color:var(--text3)">구글 시트에서 실적 데이터를 가져오고 있습니다</div>
+    </div>
+
+    <div id="body" style="display:none">
+      <div class="wbar">
+        <span class="wlabel">기간 선택</span>
+        <div id="tabs" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+      </div>
+      <div class="kgrid" id="kgrid"></div>
+      <div class="cgrid">
+        <div class="ccard">
+          <div class="cttl">멤버십 가입 구성</div>
+          <div class="csub">유료 / 무료 비율</div>
+          <div class="leg" id="mbs-leg"></div>
+          <div style="position:relative;height:185px"><canvas id="mbsC" role="img" aria-label="멤버십 구성 도넛"></canvas></div>
+        </div>
+        <div class="ccard">
+          <div class="cttl">기간별 핵심 지표 추이</div>
+          <div class="csub">전체 기간 비교</div>
+          <div class="leg" id="trend-leg"></div>
+          <div style="position:relative;height:185px"><canvas id="trendC" role="img" aria-label="추이 라인"></canvas></div>
+        </div>
+      </div>
+      <div class="ccard cfull" style="margin-bottom:12px">
+        <div class="cttl">멤버십 유입경로 비교</div>
+        <div class="csub">기간별 경로 구성</div>
+        <div class="leg" id="entry-leg"></div>
+        <div style="position:relative;height:210px"><canvas id="entryC" role="img" aria-label="유입경로 누적 바"></canvas></div>
+      </div>
+      <div class="sttl">마케팅수신동의율</div>
+      <div class="mgrid" id="mgrid"></div>
+    </div>
+  </main>
+</div>
+
+<script>
+// ── 설정 ────────────────────────────────────────────────────
+const PASSWORD  = 'lotte2026!';   // ← 비밀번호 변경
+const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTvLvMZmvY409iz-0QkjjTYgkRZI8Ly2P8qXdJ9x3q--RoSQ3mYYSCg_FijmCkUtkUNKxlzh1V__3L_/pub?gid=0&single=true&output=csv';
+// ───────────────────────────────────────────────────────────
+
+// 비밀번호
+function login(){
+  if(document.getElementById('pw').value===PASSWORD){
+    document.getElementById('lock').style.display='none';
+    document.getElementById('app').style.display='block';
+    sessionStorage.setItem('cbj_ok','1');
+    loadData();
+  } else {
+    document.getElementById('perr').style.display='block';
+    document.getElementById('pw').value='';
+  }
+}
+document.getElementById('pw').addEventListener('keydown',e=>e.key==='Enter'&&login());
+if(sessionStorage.getItem('cbj_ok')==='1'){
+  document.getElementById('lock').style.display='none';
+  document.getElementById('app').style.display='block';
+}
+
+// ── 행 매핑 (실적표 구조 기준) ──────────────────────────────
+// 스크린샷 기준: A열=항목명, B열~=기간별 데이터
+// 행 번호(0-indexed, 헤더=0행)
+const ROW = {
+  차량등록DB:      3,   멤버십유료고객:  4,  멤버십유료전환:  5,
+  차량등록고객:    6,   유료회원차량:    7,  무료회원차량:    8,
+  KT차량:          9,   기타차량:       10,  비회원차량:     11,
+  멤버십가입:     12,   유료:           13,  월구독:         14,
+  오가닉:         15,   KT:             16,  제휴기타:       17,
+  연구독:         18,   연오가닉:       19,  Tcar:           20,
+  제휴손보:       21,   무료:           22,  무료월구독:     23,
+  무료KT:         24,   단기:           25,  마이카:         26,
+  무료제휴손보:   27,   방문정비완료:   29,  정비신청:       30,
+  검사완료:       31,
+};
+
+// ── 열 파싱 ─────────────────────────────────────────────────
+let rawRows=[], colHeaders=[], charts={};
+
+function parseSheet(csv){
+  const res = Papa.parse(csv,{skipEmptyLines:false});
+  rawRows = res.data;
+  // 0행=빈행(■차방정실적표), 1행=빈행, 2행=헤더(구분, 2026년1월...)
+  // 실제 헤더는 2행
+  colHeaders = (rawRows[2]||[]).map(v=>String(v||'').trim());
+  return colHeaders;
+}
+
+function getVal(rowIdx, colIdx){
+  const row = rawRows[rowIdx] || [];
+  const v = String(row[colIdx]||'').replace(/,/g,'').trim();
+  return parseInt(v)||0;
+}
+
+function getPeriods(){
+  // B열(index 1)부터 마지막까지 헤더 (빈 것 제외)
+  return colHeaders.map((h,i)=>({label:h,col:i})).filter(c=>c.col>0&&c.label&&c.label!=='구분');
+}
+
+function getData(rowKey, colIdx){
+  const r = ROW[rowKey];
+  if(r===undefined) return 0;
+  return getVal(r, colIdx);
+}
+
+// ── 마케팅 동의율 행 매핑 ────────────────────────────────────
+// 스크린샷에 마케팅동의율 행이 있으면 행번호 지정, 없으면 null
+const MKT_ROW = {
+  전체: null, 차량: null, 멤버십: null, 정비: null, 검사: null
+};
+
+// ── 렌더링 ──────────────────────────────────────────────────
+const EC = ['#185FA5','#1D9E75','#BA7517','#D85A30','#534AB7','#5F5E5A','#993556','#0c447c'];
+const EKEYS = ['오가닉','KT','Tcar','단기','마이카','제휴기타','제휴손보','무료제휴손보'];
+const ELABELS = ['오가닉','KT','Tcar','단기','마이카','제휴/기타','제휴/손보사','무료제휴손보'];
+
+function fmt(n){return Math.round(n||0).toLocaleString();}
+function pct(a,b){return b>0?Math.round(a/b*1000)/10:0;}
+function dc(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
+
+let selCol=null;
+
+function render(colIdx){
+  selCol=colIdx;
+  const periods=getPeriods();
+  const cur=periods.find(p=>p.col===colIdx);
+  const curIdx=periods.indexOf(cur);
+  const prev=curIdx>0?periods[curIdx-1]:null;
+
+  // 탭
+  document.getElementById('tabs').innerHTML=periods.map(p=>
+    `<button class="wtab ${p.col===colIdx?'active':''}" onclick="render(${p.col})">${p.label}</button>`
+  ).join('');
+
+  // KPI
+  const kpis=[
+    {k:'차량등록DB',    label:'차량등록 DB',    ac:'var(--blue)'},
+    {k:'멤버십가입',    label:'멤버십 가입',    ac:'var(--teal)'},
+    {k:'방문정비완료',  label:'방문정비 완료',  ac:'var(--amber)'},
+    {k:'검사완료',      label:'검사 완료',      ac:'var(--coral)'},
+    {k:'멤버십유료고객',label:'멤버십 유료',    ac:'var(--purple)'},
+    {k:'멤버십유료전환',label:'유료 전환',       ac:'var(--pink)'},
+  ];
+  document.getElementById('kgrid').innerHTML=kpis.map(it=>{
+    const v=getData(it.k,colIdx);
+    const pv=prev?getData(it.k,prev.col):null;
+    const d=pv!==null?v-pv:null;
+    const tc=d===null?'fl':d>0?'up':d<0?'dn':'fl';
+    const tt=d===null?'':d>0?'▲ '+fmt(d):d<0?'▼ '+fmt(Math.abs(d)):'― 동일';
+    return `<div class="kcard" style="--ac:${it.ac}">
+      <div class="klabel">${it.label}</div>
+      <div class="kval">${fmt(v)}</div>
+      ${d!==null?`<div class="ktrend ${tc}">${tt} <span class="fl">전기 대비</span></div>`:''}
+    </div>`;
+  }).join('');
+
+  // 멤버십 도넛
+  dc('mbs');
+  const paid=getData('유료',colIdx), free=getData('무료',colIdx);
+  document.getElementById('mbs-leg').innerHTML=
+    `<span class="li"><span class="ld" style="background:#185FA5"></span>유료 ${fmt(paid)}</span>
+     <span class="li"><span class="ld" style="background:#1D9E75"></span>무료 ${fmt(free)}</span>`;
+  charts['mbs']=new Chart(document.getElementById('mbsC'),{
+    type:'doughnut',
+    data:{labels:['유료','무료'],datasets:[{data:[paid,free],backgroundColor:['#185FA5','#1D9E75'],borderWidth:0,hoverOffset:4}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},
+      tooltip:{callbacks:{label:c=>`${c.label}: ${fmt(c.raw)}건`}}}}
+  });
+
+  // 추이 라인
+  dc('trend');
+  const tSeries=[
+    {label:'차량등록',k:'차량등록DB',color:'#185FA5',dash:[]},
+    {label:'멤버십',k:'멤버십가입',color:'#1D9E75',dash:[5,3]},
+    {label:'방문정비',k:'방문정비완료',color:'#BA7517',dash:[2,2]},
+    {label:'검사',k:'검사완료',color:'#D85A30',dash:[8,3]},
+  ];
+  document.getElementById('trend-leg').innerHTML=tSeries.map(s=>
+    `<span class="li"><span class="ld" style="background:${s.color}"></span>${s.label}</span>`).join('');
+  charts['trend']=new Chart(document.getElementById('trendC'),{
+    type:'line',
+    data:{labels:periods.map(p=>p.label),datasets:tSeries.map(s=>({
+      label:s.label,data:periods.map(p=>getData(s.k,p.col)),
+      borderColor:s.color,backgroundColor:'transparent',borderDash:s.dash,tension:0.3,
+      pointRadius:3,pointHoverRadius:5,
+      pointBackgroundColor:periods.map(p=>p.col===colIdx?s.color:'transparent'),
+      pointBorderColor:s.color,pointBorderWidth:2
+    }))},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false}},
+      scales:{x:{ticks:{autoSkip:false,maxRotation:45,font:{size:10}}},
+              y:{beginAtZero:true,ticks:{font:{size:10}}}}}
+  });
+
+  // 유입경로 누적 바
+  dc('entry');
+  document.getElementById('entry-leg').innerHTML=EKEYS.map((e,i)=>
+    `<span class="li"><span class="ld" style="background:${EC[i]}"></span>${ELABELS[i]}</span>`).join('');
+  charts['entry']=new Chart(document.getElementById('entryC'),{
+    type:'bar',
+    data:{labels:periods.map(p=>p.label),datasets:EKEYS.map((e,i)=>({
+      label:ELABELS[i],data:periods.map(p=>getData(e,p.col)),
+      backgroundColor:EC[i],borderWidth:0
+    }))},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{mode:'index'}},
+      scales:{x:{stacked:true,ticks:{autoSkip:false,maxRotation:45,font:{size:10}}},
+              y:{stacked:true,beginAtZero:true,ticks:{font:{size:10}}}}}
+  });
+
+  // 마케팅 동의율
+  const mktItems=[
+    {label:'전체',    rk:'전체'},
+    {label:'차량등록',rk:'차량'},
+    {label:'멤버십',  rk:'멤버십'},
+    {label:'방문정비',rk:'정비'},
+    {label:'자동차검사',rk:'검사'},
+  ];
+  document.getElementById('mgrid').innerHTML=mktItems.map(it=>{
+    const ri=MKT_ROW[it.rk];
+    const r=ri!==null?getVal(ri,colIdx):null;
+    const disp=r!==null?r.toFixed(1)+'%':'—';
+    const w=r!==null?Math.min(r,100):0;
+    return `<div class="mcard">
+      <div class="mlabel">${it.label}</div>
+      <div class="mbar"><div class="mfill" style="width:${w}%"></div></div>
+      <div class="mpct">${disp}</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('empty').style.display='none';
+  document.getElementById('body').style.display='block';
+}
+
+// ── 데이터 로드 ─────────────────────────────────────────────
+function loadData(){
+  document.getElementById('spin').style.display='block';
+  document.getElementById('dinfo').textContent='로딩 중...';
+  fetch(SHEET_URL)
+    .then(r=>r.text())
+    .then(csv=>{
+      parseSheet(csv);
+      const periods=getPeriods();
+      if(!periods.length){
+        document.getElementById('dinfo').textContent='데이터 없음';
+        document.getElementById('spin').style.display='none';
+        return;
+      }
+      const now=new Date().toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
+      document.getElementById('hbadge').textContent=periods[periods.length-1].label+' 기준';
+      document.getElementById('dinfo').textContent='업데이트 '+now;
+      document.getElementById('spin').style.display='none';
+      render(periods[periods.length-1].col);
+    })
+    .catch(e=>{
+      document.getElementById('dinfo').textContent='로드 실패 — 재시도';
+      document.getElementById('spin').style.display='none';
+      console.error(e);
+    });
+}
+
+if(sessionStorage.getItem('cbj_ok')==='1') loadData();
+</script>
+</body>
+</html>
