@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>차방정 주실적 대시보드</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+:root{
+  --bg:#f5f6f8;--sf:#fff;--bd:#e2e5ea;
+  --t:#1a1d23;--t2:#6b7280;--t3:#9ca3af;
+  --blue:#185FA5;--teal:#1D9E75;--amber:#BA7517;
+  --coral:#D85A30;--purple:#534AB7;--pink:#993556;
+  --r:10px;--rs:6px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Apple SD Gothic Neo','Noto Sans KR',sans-serif;background:var(--bg);color:var(--t);font-size:14px}
+
+/* 잠금화면 */
+#lock{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:9999}
+.lcard{background:var(--sf);border:1px solid var(--bd);border-radius:16px;padding:2.5rem 2rem;width:320px;text-align:center}
+.llogo{font-size:26px;font-weight:700;color:var(--blue);margin-bottom:4px}
+.lsub{font-size:12px;color:var(--t2);margin-bottom:1.5rem}
+.lcard input{width:100%;padding:10px 14px;border:1px solid var(--bd);border-radius:var(--rs);font-size:14px;margin-bottom:10px;outline:none;background:var(--bg)}
+.lcard input:focus{border-color:var(--blue)}
+.lbtn{width:100%;padding:10px;background:var(--blue);color:#fff;border:none;border-radius:var(--rs);font-size:14px;font-weight:500;cursor:pointer}
+.lbtn:hover{background:#0c447c}
+.lerr{font-size:12px;color:#e24b4a;margin-top:6px;display:none}
+
+/* 앱 */
+#app{display:none}
+header{background:var(--sf);border-bottom:1px solid var(--bd);padding:0 2rem;display:flex;align-items:center;justify-content:space-between;height:54px;position:sticky;top:0;z-index:100}
+.hlogo{font-size:15px;font-weight:700;color:var(--blue)}
+.hbadge{font-size:11px;background:#e8f0fb;color:var(--blue);padding:2px 8px;border-radius:20px;font-weight:500;margin-left:8px}
+.hright{display:flex;align-items:center;gap:12px}
+.rbtn{padding:6px 12px;border:1px solid var(--bd);border-radius:var(--rs);background:var(--sf);font-size:12px;cursor:pointer;color:var(--t2)}
+.rbtn:hover{background:var(--bg)}
+.dinfo{font-size:11px;color:var(--t3)}
+#spin{display:none;width:14px;height:14px;border:2px solid var(--bd);border-top-color:var(--blue);border-radius:50%;animation:sp .6s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+main{padding:1.5rem 2rem;max-width:1200px;margin:0 auto}
+
+/* 주차 탭 */
+.wbar{display:flex;align-items:center;gap:6px;margin-bottom:1.5rem;flex-wrap:wrap}
+.wlbl{font-size:12px;color:var(--t3);margin-right:2px;white-space:nowrap}
+.wtab{padding:5px 13px;border-radius:20px;border:1px solid var(--bd);font-size:12px;cursor:pointer;background:var(--sf);color:var(--t2);transition:all .15s;white-space:nowrap}
+.wtab.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+.wtab:hover:not(.active){background:var(--bg)}
+
+/* KPI */
+.kg{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:10px;margin-bottom:1.25rem}
+.kc{background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:1rem 1.1rem;border-top:3px solid var(--ac,var(--blue))}
+.kl{font-size:11px;color:var(--t2);margin-bottom:3px}
+.kv{font-size:24px;font-weight:700;color:var(--t)}
+.kt2{font-size:11px;margin-top:2px}
+.up{color:var(--teal)}.dn{color:var(--coral)}.fl{color:var(--t3)}
+
+/* 차트 */
+.cg{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.cfull{grid-column:1/-1}
+.cc{background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:1.1rem}
+.cttl{font-size:13px;font-weight:600;margin-bottom:2px}
+.csub{font-size:11px;color:var(--t3);margin-bottom:10px}
+.leg{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+.li{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--t2)}
+.ld{width:9px;height:9px;border-radius:2px;flex-shrink:0}
+
+/* 마케팅 */
+.sttl{font-size:13px;font-weight:600;margin:1.25rem 0 .6rem}
+.mg{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:8px;margin-bottom:1.5rem}
+.mc{background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:.9rem}
+.ml{font-size:11px;color:var(--t2);margin-bottom:7px}
+.mb{background:var(--bg);border-radius:4px;height:5px;margin-bottom:5px}
+.mf{background:var(--blue);border-radius:4px;height:5px;transition:width .5s}
+.mp{font-size:20px;font-weight:700}
+
+/* 에러 */
+#errmsg{text-align:center;padding:3rem;color:var(--t2);display:none}
+
+@media(max-width:640px){
+  main{padding:1rem}
+  .cg{grid-template-columns:1fr}
+  header{padding:0 1rem}
+}
+</style>
+</head>
+<body>
+
+<div id="lock">
+  <div class="lcard">
+    <div class="llogo">차방정</div>
+    <div class="lsub">롯데렌탈 내부용 실적 대시보드</div>
+    <input type="password" id="pw" placeholder="비밀번호 입력">
+    <button class="lbtn" onclick="login()">로그인</button>
+    <div class="lerr" id="perr">비밀번호가 올바르지 않습니다.</div>
+  </div>
+</div>
+
+<div id="app">
+  <header>
+    <div style="display:flex;align-items:center">
+      <span class="hlogo">차방정 실적</span>
+      <span class="hbadge" id="hbadge">로딩 중</span>
+    </div>
+    <div class="hright">
+      <span class="dinfo" id="dinfo"></span>
+      <div id="spin"></div>
+      <button class="rbtn" onclick="loadData()">↻ 새로고침</button>
+    </div>
+  </header>
+  <main>
+    <div id="errmsg">
+      <p style="font-size:15px;font-weight:500;margin-bottom:8px">데이터 로드 실패</p>
+      <p style="font-size:12px;color:var(--t3)" id="errtxt"></p>
+    </div>
+    <div id="body" style="display:none">
+      <div class="wbar">
+        <span class="wlbl">기간 선택</span>
+        <div id="tabs" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+      </div>
+      <div class="kg" id="kg"></div>
+      <div class="cg">
+        <div class="cc">
+          <div class="cttl">멤버십 가입 구성</div>
+          <div class="csub">유료 / 무료 비율</div>
+          <div class="leg" id="mleg"></div>
+          <div style="position:relative;height:185px"><canvas id="mbsC" role="img" aria-label="멤버십 도넛"></canvas></div>
+        </div>
+        <div class="cc">
+          <div class="cttl">기간별 핵심 지표 추이</div>
+          <div class="csub">전체 기간 비교</div>
+          <div class="leg" id="tleg"></div>
+          <div style="position:relative;height:185px"><canvas id="trendC" role="img" aria-label="추이 라인"></canvas></div>
+        </div>
+      </div>
+      <div class="cc cfull" style="margin-bottom:12px">
+        <div class="cttl">멤버십 유입경로 비교</div>
+        <div class="csub">기간별 경로 구성</div>
+        <div class="leg" id="eleg"></div>
+        <div style="position:relative;height:210px"><canvas id="entryC" role="img" aria-label="유입경로 바"></canvas></div>
+      </div>
+      <div class="sttl">마케팅수신동의율</div>
+      <div class="mg" id="mg"></div>
+    </div>
+  </main>
+</div>
+
+<script>
+const PASSWORD = 'lotte2026!';
+const SHEET_CSV = 'https://docs.google.com/spreadsheets/d/18zyaktpjyjhwZ7lHla8Qx9DtSPmah9G3lCHrDi4W0mU/gviz/tq?tqx=out:csv&sheet=실적';
+
+// 기간 열 매핑 (col5~15) — 병합으로 헤더 비어있는 열 수동 지정
+const PERIOD_COLS = [
+  {col:5,  label:'2026년 1월'},
+  {col:6,  label:'2026년 2월'},
+  {col:7,  label:'2026년 3월'},
+  {col:8,  label:'2026년 4월'},
+  {col:9,  label:'5월1주차'},
+  {col:10, label:'5월2주차'},
+  {col:11, label:'5월3주차'},
+  {col:12, label:'5월4주차'},
+  {col:13, label:'5월5주차'},
+  {col:14, label:'5월 누계'},
+  {col:15, label:'2026년 누계'},
+];
+
+// 행 매핑 (0-indexed, CSV row[N])
+const R = {
+  차량등록DB:      4,  멤버십유료고객:  5,  멤버십유료전환:  6,
+  차량등록고객:    7,  유료회원차량:    8,  무료회원차량:    9,
+  KT차량:         10,  기타차량:       11,  비회원차량:     12,
+  멤버십가입:     13,  유료:           14,  월구독:         15,
+  오가닉월:       16,  KT월:           17,  제휴기타:       18,
+  연구독:         19,  오가닉연:       20,  Tcar:           21,
+  제휴손보:       22,  무료:           23,  무료월구독:     24,
+  무료KT:         25,  단기:           26,  마이카:         27,
+  무료제휴손보:   28,  방문정비완료:   30,  정비신청:       31,
+  검사완료:       32,  검사신청:       33,
+  마케팅전체:     34,  마케팅차량:     35,  마케팅멤버십:   36,
+  마케팅정비:     37,  마케팅검사:     38,
+};
+
+let rows = [], charts = {};
+
+function n(rowIdx, colIdx){
+  const v = String((rows[rowIdx]||[])[colIdx]||'')
+    .replace(/,/g,'').replace(/%/g,'').trim();
+  return v===''||v==='-' ? 0 : parseFloat(v)||0;
+}
+function fmt(v){ return Math.round(v||0).toLocaleString(); }
+function dc(id){ if(charts[id]){charts[id].destroy();delete charts[id];} }
+
+let selCol = null;
+
+function render(colIdx){
+  selCol = colIdx;
+
+  // 탭
+  document.getElementById('tabs').innerHTML = PERIOD_COLS.map(p=>
+    `<button class="wtab ${p.col===colIdx?'active':''}" onclick="render(${p.col})">${p.label}</button>`
+  ).join('');
+
+  // 전기 열
+  const ci = PERIOD_COLS.findIndex(p=>p.col===colIdx);
+  const prevCol = ci > 0 ? PERIOD_COLS[ci-1].col : null;
+
+  // KPI
+  const kpis = [
+    {k:'차량등록DB',    lb:'차량등록 DB',   ac:'var(--blue)'},
+    {k:'멤버십가입',    lb:'멤버십 가입',   ac:'var(--teal)'},
+    {k:'방문정비완료',  lb:'방문정비 완료', ac:'var(--amber)'},
+    {k:'검사완료',      lb:'검사 완료',     ac:'var(--coral)'},
+    {k:'유료',          lb:'멤버십 유료',   ac:'var(--purple)'},
+    {k:'멤버십유료전환',lb:'유료 전환',     ac:'var(--pink)'},
+  ];
+  document.getElementById('kg').innerHTML = kpis.map(it=>{
+    const v = n(R[it.k], colIdx);
+    const pv = prevCol !== null ? n(R[it.k], prevCol) : null;
+    const d = pv !== null ? v - pv : null;
+    const tc = d===null?'fl':d>0?'up':d<0?'dn':'fl';
+    const tt = d===null?'': d>0?'▲ '+fmt(d): d<0?'▼ '+fmt(Math.abs(d)):'― 동일';
+    return `<div class="kc" style="--ac:${it.ac}">
+      <div class="kl">${it.lb}</div>
+      <div class="kv">${fmt(v)}</div>
+      ${d!==null?`<div class="kt2 ${tc}">${tt} <span class="fl">전기 대비</span></div>`:''}
+    </div>`;
+  }).join('');
+
+  // 멤버십 도넛
+  dc('mbs');
+  const paid=n(R['유료'],colIdx), free=n(R['무료'],colIdx);
+  document.getElementById('mleg').innerHTML =
+    `<span class="li"><span class="ld" style="background:#185FA5"></span>유료 ${fmt(paid)}</span>
+     <span class="li"><span class="ld" style="background:#1D9E75"></span>무료 ${fmt(free)}</span>`;
+  charts['mbs'] = new Chart(document.getElementById('mbsC'),{
+    type:'doughnut',
+    data:{labels:['유료','무료'],datasets:[{data:[paid,free],backgroundColor:['#185FA5','#1D9E75'],borderWidth:0,hoverOffset:4}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${fmt(c.raw)}건`}}}}
+  });
+
+  // 추이 라인
+  dc('trend');
+  const ts = [
+    {lb:'차량등록', k:'차량등록DB',   color:'#185FA5',dash:[]},
+    {lb:'멤버십',   k:'멤버십가입',   color:'#1D9E75',dash:[5,3]},
+    {lb:'방문정비', k:'방문정비완료', color:'#BA7517',dash:[2,2]},
+    {lb:'검사',     k:'검사완료',     color:'#D85A30',dash:[8,3]},
+  ];
+  document.getElementById('tleg').innerHTML = ts.map(s=>
+    `<span class="li"><span class="ld" style="background:${s.color}"></span>${s.lb}</span>`).join('');
+  charts['trend'] = new Chart(document.getElementById('trendC'),{
+    type:'line',
+    data:{labels:PERIOD_COLS.map(p=>p.label), datasets:ts.map(s=>({
+      label:s.lb, data:PERIOD_COLS.map(p=>n(R[s.k],p.col)),
+      borderColor:s.color, backgroundColor:'transparent', borderDash:s.dash,
+      tension:0.3, pointRadius:3, pointHoverRadius:5,
+      pointBackgroundColor:PERIOD_COLS.map(p=>p.col===colIdx?s.color:'transparent'),
+      pointBorderColor:s.color, pointBorderWidth:2,
+    }))},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false}},
+      scales:{
+        x:{ticks:{autoSkip:false,maxRotation:45,font:{size:10}}},
+        y:{beginAtZero:true,ticks:{font:{size:10}}}
+      }}
+  });
+
+  // 유입경로 바
+  dc('entry');
+  const ec=['#185FA5','#1D9E75','#BA7517','#D85A30','#534AB7','#5F5E5A','#993556'];
+  const ekeys=[
+    {k:'오가닉월',  lb:'오가닉'},
+    {k:'KT월',      lb:'KT'},
+    {k:'Tcar',      lb:'Tcar'},
+    {k:'단기',      lb:'단기'},
+    {k:'마이카',    lb:'마이카'},
+    {k:'제휴기타',  lb:'제휴/기타'},
+    {k:'제휴손보',  lb:'제휴/손보사'},
+  ];
+  document.getElementById('eleg').innerHTML = ekeys.map((e,i)=>
+    `<span class="li"><span class="ld" style="background:${ec[i]}"></span>${e.lb}</span>`).join('');
+  charts['entry'] = new Chart(document.getElementById('entryC'),{
+    type:'bar',
+    data:{labels:PERIOD_COLS.map(p=>p.label), datasets:ekeys.map((e,i)=>({
+      label:e.lb, data:PERIOD_COLS.map(p=>n(R[e.k],p.col)),
+      backgroundColor:ec[i], borderWidth:0,
+    }))},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{mode:'index'}},
+      scales:{
+        x:{stacked:true,ticks:{autoSkip:false,maxRotation:45,font:{size:10}}},
+        y:{stacked:true,beginAtZero:true,ticks:{font:{size:10}}}
+      }}
+  });
+
+  // 마케팅수신동의율
+  const mkt=[
+    {lb:'전체',     k:'마케팅전체'},
+    {lb:'차량등록', k:'마케팅차량'},
+    {lb:'멤버십',   k:'마케팅멤버십'},
+    {lb:'방문정비', k:'마케팅정비'},
+    {lb:'자동차검사',k:'마케팅검사'},
+  ];
+  document.getElementById('mg').innerHTML = mkt.map(it=>{
+    const r = n(R[it.k], colIdx);
+    return `<div class="mc">
+      <div class="ml">${it.lb}</div>
+      <div class="mb"><div class="mf" style="width:${Math.min(r,100)}%"></div></div>
+      <div class="mp">${r>0?r.toFixed(1)+'%':'—'}</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('body').style.display='block';
+  document.getElementById('errmsg').style.display='none';
+}
+
+function loadData(){
+  document.getElementById('spin').style.display='block';
+  document.getElementById('dinfo').textContent='로딩 중...';
+
+  Papa.parse(SHEET_CSV,{
+    download:true, skipEmptyLines:false,
+    complete(res){
+      rows = res.data;
+      const now = new Date().toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
+      document.getElementById('hbadge').textContent = PERIOD_COLS[PERIOD_COLS.length-1].label+' 기준';
+      document.getElementById('dinfo').textContent = '업데이트 '+now;
+      document.getElementById('spin').style.display='none';
+      // 가장 최근 주차(5월5주차) 기본 선택
+      render(PERIOD_COLS[PERIOD_COLS.length-3].col); // 5월5주차
+    },
+    error(e){
+      document.getElementById('dinfo').textContent='로드 실패';
+      document.getElementById('spin').style.display='none';
+      document.getElementById('errmsg').style.display='block';
+      document.getElementById('errtxt').textContent='오류: '+e.message;
+    }
+  });
+}
+
+// 비밀번호
+document.getElementById('pw').addEventListener('keydown',e=>e.key==='Enter'&&login());
+function login(){
+  if(document.getElementById('pw').value===PASSWORD){
+    document.getElementById('lock').style.display='none';
+    document.getElementById('app').style.display='block';
+    sessionStorage.setItem('cbj','1');
+    loadData();
+  } else {
+    document.getElementById('perr').style.display='block';
+    document.getElementById('pw').value='';
+  }
+}
+if(sessionStorage.getItem('cbj')==='1'){
+  document.getElementById('lock').style.display='none';
+  document.getElementById('app').style.display='block';
+  loadData();
+}
+</script>
+</body>
+</html>
