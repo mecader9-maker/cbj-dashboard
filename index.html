@@ -174,16 +174,16 @@ if(sessionStorage.getItem('cbj_ok')==='1'){
 // 스크린샷 기준: A열=항목명, B열~=기간별 데이터
 // 행 번호(0-indexed, 헤더=0행)
 const ROW = {
-  차량등록DB:      3,   멤버십유료고객:  4,  멤버십유료전환:  5,
-  차량등록고객:    6,   유료회원차량:    7,  무료회원차량:    8,
-  KT차량:          9,   기타차량:       10,  비회원차량:     11,
-  멤버십가입:     12,   유료:           13,  월구독:         14,
-  오가닉:         15,   KT:             16,  제휴기타:       17,
-  연구독:         18,   연오가닉:       19,  Tcar:           20,
-  제휴손보:       21,   무료:           22,  무료월구독:     23,
-  무료KT:         24,   단기:           25,  마이카:         26,
-  무료제휴손보:   27,   방문정비완료:   29,  정비신청:       30,
-  검사완료:       31,
+  차량등록DB:      5,   멤버십유료고객:  6,  멤버십유료전환:  7,
+  차량등록고객:    8,   유료회원차량:    9,  무료회원차량:   10,
+  KT차량:         11,   기타차량:       12,  비회원차량:     13,
+  멤버십가입:     14,   유료:           15,  월구독:         16,
+  오가닉:         17,   KT:             18,  제휴기타:       19,
+  연구독:         20,   연오가닉:       21,  Tcar:           22,
+  제휴손보:       23,   무료:           24,  무료월구독:     25,
+  무료KT:         26,   단기:           27,  마이카:         28,
+  무료제휴손보:   29,   방문정비완료:   30,  정비신청:       31,
+  검사완료:       32,
 };
 
 // ── 열 파싱 ─────────────────────────────────────────────────
@@ -192,21 +192,22 @@ let rawRows=[], colHeaders=[], charts={};
 function parseSheet(csv){
   const res = Papa.parse(csv,{skipEmptyLines:false});
   rawRows = res.data;
-  // 0행=빈행(■차방정실적표), 1행=빈행, 2행=헤더(구분, 2026년1월...)
-  // 실제 헤더는 2행
-  colHeaders = (rawRows[2]||[]).map(v=>String(v||'').trim());
+  // row[0] = 1행(제목), row[1] = 2행(헤더)
+  colHeaders = (rawRows[1]||[]).map(v=>String(v||'').trim());
   return colHeaders;
 }
 
 function getVal(rowIdx, colIdx){
-  const row = rawRows[rowIdx] || [];
-  const v = String(row[colIdx]||'').replace(/,/g,'').trim();
-  return parseInt(v)||0;
+  // rowIdx: 엑셀 행번호(1-indexed) → CSV 0-indexed = rowIdx-1
+  const row = rawRows[rowIdx-1] || [];
+  const v = String(row[colIdx]||'').replace(/,/g,'').replace(/-/g,'0').trim();
+  return parseFloat(v)||0;
 }
 
 function getPeriods(){
-  // B열(index 1)부터 마지막까지 헤더 (빈 것 제외)
-  return colHeaders.map((h,i)=>({label:h,col:i})).filter(c=>c.col>0&&c.label&&c.label!=='구분');
+  // F열(index 5)부터 헤더 읽기 (A~E열은 항목명 병합 영역)
+  return colHeaders.map((h,i)=>({label:h,col:i}))
+    .filter(c=>c.col>=5 && c.label && c.label.trim()!=='' && c.label!=='구분');
 }
 
 function getData(rowKey, colIdx){
@@ -218,7 +219,11 @@ function getData(rowKey, colIdx){
 // ── 마케팅 동의율 행 매핑 ────────────────────────────────────
 // 스크린샷에 마케팅동의율 행이 있으면 행번호 지정, 없으면 null
 const MKT_ROW = {
-  전체: null, 차량: null, 멤버십: null, 정비: null, 검사: null
+  전체:   36,
+  차량:   37,
+  멤버십: 38,
+  정비:   39,
+  검사:   40,
 };
 
 // ── 렌더링 ──────────────────────────────────────────────────
@@ -348,13 +353,23 @@ function render(colIdx){
 function loadData(){
   document.getElementById('spin').style.display='block';
   document.getElementById('dinfo').textContent='로딩 중...';
-  fetch(SHEET_URL)
-    .then(r=>r.text())
-    .then(csv=>{
+
+  // CORS 우회: 구글 시트 gviz API (JSONP 방식)
+  const sheetId = SHEET_URL.match(/\/d\/e\/([^/]+)\//)?.[1] ||
+                  SHEET_URL.match(/spreadsheets\/d\/([^/]+)\//)?.[1];
+  const jsonpUrl = `https://docs.google.com/spreadsheets/d/e/${sheetId}/pub?output=csv&cachebust=${Date.now()}`;
+
+  // iframe을 통한 CSV 로드 (CORS 우회)
+  const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(SHEET_URL)}&timestamp=${Date.now()}`;
+
+  fetch(proxyUrl)
+    .then(r=>r.json())
+    .then(data=>{
+      const csv = data.contents;
       parseSheet(csv);
       const periods=getPeriods();
       if(!periods.length){
-        document.getElementById('dinfo').textContent='데이터 없음';
+        document.getElementById('dinfo').textContent='데이터 없음 — 구글 시트 확인 필요';
         document.getElementById('spin').style.display='none';
         return;
       }
